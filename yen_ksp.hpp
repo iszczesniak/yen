@@ -73,16 +73,18 @@ namespace boost {
     // Try to find the (optional) shortest path.
     optional<kr_type> osp = custom_dijkstra_call(g, s, t, wm, im);
 
-    // We quit if there was no shortest path.
-    if (!osp)
-      return A;
-    
-    // The first shortest path found becomes our first solution.
-    A.push_back(std::move(osp.get()));
+    if (osp)
+      // The first shortest path found becomes our first solution.
+      B.insert(std::move(osp.get()));
 
-    // In each iteration we produce the next k-th shortest path.
-    for (int k = 2; !K || k <= K.get(); ++k)
+    // In each iteration we produce the k-th shortest path.
+    for (int k = 1; !B.empty() && (!K || k <= K.get()); ++k)
       {
+        // Take the shortest tentative path and make it the next
+        // shortest path.
+        A.push_back(*B.begin());
+        B.erase(B.begin());
+
         // The previous shortest result and path.
         const auto &psr = A.back();
         const auto &psp = psr.second;
@@ -170,15 +172,6 @@ namespace boost {
             rr.first += get(wm, edge);
             rr.second.push_back(edge);
           }
-
-        // Stop searching when there are no tentative paths.
-        if (B.empty())
-          break;
-
-        // Take the shortest tentative path and make it the next
-        // shortest path.
-        A.push_back(std::move(*B.begin()));
-        B.erase(B.begin());
       }
     
     return A;

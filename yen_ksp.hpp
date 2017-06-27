@@ -169,8 +169,11 @@ namespace boost {
 
         // Take the shortest tentative path and make it the next
         // shortest path.
-        ksp = *B.begin();
-        B.erase(B.begin());
+        if (!B.empty())
+          {
+            ksp = *B.begin();
+            B.erase(B.begin());
+          }
       }
   
     if (ksp)

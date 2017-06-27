@@ -39,52 +39,43 @@
 
 namespace boost {
 
+  template <typename G>
+  using Edge = typename G::edge_descriptor;
+
+  template <typename G>
+  using Vertex = typename G::vertex_descriptor;
+
+  template <typename G>
+  using Path = std::list<Edge<G>>;
+  
+  template <typename W, typename G>
+  using Result = std::pair<W, Path<G>>;
+
   template <typename Graph, typename WeightMap, typename IndexMap>
-  std::list<std::pair<typename WeightMap::value_type,
-                      std::list<typename Graph::edge_descriptor>>>
-  yen_ksp(const Graph& g,
-          typename Graph::vertex_descriptor s,
-          typename Graph::vertex_descriptor t,
-          WeightMap wm, IndexMap im, optional<unsigned> K)
+  bool
+  yen_ksp(const Graph& g, Vertex<Graph> s, Vertex<Graph> t,
+          WeightMap wm, IndexMap im,
+          std::list<Result<typename WeightMap::value_type, Graph>> &A,
+          std::set<Result<typename WeightMap::value_type, Graph>> &B)
   {
-    typedef typename Graph::vertex_descriptor vertex_descriptor;
-    typedef typename Graph::edge_descriptor edge_descriptor;
-    typedef typename WeightMap::value_type weight_type;
-    typedef std::set<edge_descriptor> es_type;
-    typedef std::set<vertex_descriptor> vs_type;
-    typedef filtered_graph<Graph, is_not_in_subset<es_type>,
-                           is_not_in_subset<vs_type>> fg_type;
-    typedef std::list<edge_descriptor> path_type;
-    typedef std::pair<weight_type, path_type> kr_type;
+    using vs_type = std::set<Vertex<Graph>>;
+    using es_type = std::set<Edge<Graph>>;
+    using kr_type = Result<typename WeightMap::value_type, Graph>;
+    using fg_type = filtered_graph<Graph,
+                                   is_not_in_subset<es_type>,
+                                   is_not_in_subset<vs_type>>;
 
-    // The shortest paths - these we return.
-    std::list<kr_type> A;
+    optional<kr_type> ksp;
 
-    // An empty result if the source and destination are the same.
-    if (s == t)
-      return A;
-
-    // The tentative paths - these are candidate paths.  It's a set,
-    // because we want to make sure that a given result can show up in
-    // the set of tentative results only once.  The problem is that
-    // the algorithm can find the same tentative path many times.
-    std::set<kr_type> B;
-
-    // Try to find the (optional) shortest path.
-    optional<kr_type> osp = custom_dijkstra_call(g, s, t, wm, im);
-
-    if (osp)
-      // The first shortest path found becomes our first solution.
-      B.insert(std::move(osp.get()));
-
-    // In each iteration we produce the k-th shortest path.
-    for (int k = 1; !B.empty() && (!K || k <= K.get()); ++k)
+    // If A is empty, then we're looking for the first shortest path.
+    if (A.empty())
       {
-        // Take the shortest tentative path and make it the next
-        // shortest path.
-        A.push_back(*B.begin());
-        B.erase(B.begin());
-
+        assert(B.empty());
+        // Try to find the (optional) shortest path.
+        ksp = custom_dijkstra_call(g, s, t, wm, im);
+      }
+    else
+      {
         // The previous shortest result and path.
         const auto &psr = A.back();
         const auto &psp = psr.second;
@@ -103,33 +94,34 @@ namespace boost {
         // The filtered graph.
         fg_type fg(g, ep, vp);
 
-        // The root result: the cost and the root path.
+        // The root result.
         kr_type rr;
         // The root path.
-        const path_type &rp = rr.second;
+        const Path<Graph> &rp = rr.second;
 
         // Use the previous shortest path to get tentative paths.  We
         // can go ahead with the loop without checking any condition
         // (the condition in the for-statement is true): the path
         // found must have at least one link, because s != t.
-        for(typename path_type::const_iterator i = psp.begin(); true;)
+        for(typename Path<Graph>::const_iterator i = psp.begin();
+            true;)
           {
             // An edge of the previous shortest path.
-            const edge_descriptor &edge = *i;
+            const Edge<Graph> &edge = *i;
 
             // The spur vertex - we try to deviate at this node.
-            const vertex_descriptor &sv = source(edge, g);
+            const Vertex<Graph> &sv = source(edge, g);
 
-            // Iterate over all previous shortest paths.
-            // An iteration examines j-th shortest path.
+            // Iterate over all previous shortest paths.  An iteration
+            // examines j-th shortest path.
             for(const auto &jr: A)
               {
                 // The j-th shortest path.
-                const path_type &jp = jr.second;
+                const Path<Graph> &jp = jr.second;
 
                 // Let's prepare for the comparison.
-                typename path_type::const_iterator jpi = jp.begin();
-                typename path_type::const_iterator rpi = rp.begin();
+                typename Path<Graph>::const_iterator jpi = jp.begin();
+                typename Path<Graph>::const_iterator rpi = rp.begin();
 
                 // Iterate as long as the edges are equal.
                 while(jpi != jp.end() && rpi != rp.end() && *jpi == *rpi)
@@ -145,14 +137,16 @@ namespace boost {
               }
 
             // Optional spur result.
-            optional<kr_type> osr = custom_dijkstra_call(fg, sv, t, wm, im);
+            optional<kr_type>
+              osr = custom_dijkstra_call(fg, sv, t, wm, im);
 
             if (osr)
               {
                 // The tentative result.
                 kr_type tr = std::move(osr.get());
                 tr.first += rr.first;
-                tr.second.insert(tr.second.begin(), rp.begin(), rp.end());
+                tr.second.insert(tr.second.begin(), rp.begin(),
+                                 rp.end());
                 B.insert(std::move(tr));
               }
 
@@ -172,17 +166,54 @@ namespace boost {
             rr.first += get(wm, edge);
             rr.second.push_back(edge);
           }
+
+        // Take the shortest tentative path and make it the next
+        // shortest path.
+        ksp = *B.begin();
+        B.erase(B.begin());
       }
-    
+  
+    if (ksp)
+      A.push_back(std::move(ksp.get()));
+          
+    return bool(ksp);
+  }
+  
+  template <typename Graph, typename WeightMap, typename IndexMap>
+  std::list<std::pair<typename WeightMap::value_type,
+                      std::list<typename Graph::edge_descriptor>>>
+  yen_ksp(const Graph& g, Vertex<Graph> s, Vertex<Graph> t,
+          WeightMap wm, IndexMap im, optional<unsigned> K)
+  {
+    using kr_type = Result<typename WeightMap::value_type, Graph>;
+
+    // The shortest paths - these we return.
+    std::list<kr_type> A;
+
+    // An empty result if the source and destination are the same.
+    if (s != t)
+      {
+        // The tentative paths - these are candidate paths.  It's a
+        // set, because we want to make sure that a given result can
+        // show up in the set of tentative results only once.  The
+        // problem is that the algorithm can find the same tentative
+        // path many times.
+        std::set<kr_type> B;
+
+        // In each iteration we produce the k-th shortest path.
+        for (int k = 1; !K || k <= K.get(); ++k)
+          if (!yen_ksp(g, s, t, wm, im, A, B))
+            // We break the loop if no path was found.
+            break;
+      }
+
     return A;
   }
 
   template <typename Graph>
   std::list<std::pair<typename property_map<Graph, edge_weight_t>::value_type,
-                      std::list<typename Graph::edge_descriptor>>>
-  yen_ksp(Graph& g,
-          typename Graph::vertex_descriptor s,
-          typename Graph::vertex_descriptor t,
+                      std::list<Edge<Graph>>>>
+  yen_ksp(const Graph& g, Vertex<Graph> s, Vertex<Graph> t,
           optional<unsigned> K = optional<unsigned>())
   {
     return yen_ksp(g, s, t, get(edge_weight_t(), g),

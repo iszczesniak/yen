@@ -22,7 +22,6 @@
 #include <boost/graph/visitors.hpp>
 #include <boost/optional.hpp>
 #include <boost/property_map/property_map.hpp>
-#include <boost/utility/value_init.hpp>
 
 namespace boost {
 
@@ -39,78 +38,91 @@ namespace boost {
   {
     typedef typename Graph::vertex_descriptor vertex_descriptor;
     typedef on_examine_vertex event_filter;
-    cdc_visitor(vertex_descriptor t): m_t(t) {}
+    cdc_visitor(vertex_descriptor dst): m_dst(dst) {}
     void operator()(vertex_descriptor v, const Graph& g) {
-      if (v == m_t)
+      if (v == m_dst)
         throw cdc_exception();
     }
-    vertex_descriptor m_t;
+    vertex_descriptor m_dst;
   };
 
   // =======================================================================
-  // The function.
+  // The function that traces back the result.
+  // =======================================================================
+
+  template <typename Graph, typename WeightMap, typename PredMap>
+  optional<std::pair<typename WeightMap::value_type,
+                     std::list<typename Graph::edge_descriptor> > >
+  trace(const Graph &g, WeightMap wm, PredMap pred,
+        typename Graph::vertex_descriptor src,
+        typename Graph::vertex_descriptor dst)
+  {
+    typedef typename Graph::vertex_descriptor vertex_descriptor;
+    typedef typename Graph::edge_descriptor edge_descriptor;
+    typedef typename WeightMap::value_type weight_type;
+    typedef typename std::list<typename Graph::edge_descriptor> path_type;
+    // The result type.
+    typedef typename std::pair<weight_type, path_type> r_type;
+
+    optional<r_type> result;
+
+    // Was the solution found?
+    if (pred[dst] != edge_descriptor())
+      {
+        // The result.
+        r_type r;
+
+        // Trace the solution to the source.
+        vertex_descriptor c = dst;
+        while (c != src)
+          {
+            const edge_descriptor &e = pred[c];
+            // Increase the cost.
+            r.first += get(wm, e);
+            // Add the edge to the path.
+            r.second.push_front(e);
+            // Find the predecessing vertex.
+            c = source(e, g);
+          }
+
+        result = std::move(r);
+      }
+
+    return result;
+  }
+
+  // =======================================================================
+  // The function that calls Dijkstra.
   // =======================================================================
 
   template <typename Graph, typename WeightMap, typename IndexMap>
   optional<std::pair<typename WeightMap::value_type,
-                     std::list<typename Graph::edge_descriptor>>>
+                     std::list<typename Graph::edge_descriptor> > >
   custom_dijkstra_call(const Graph &g,
-                       typename Graph::vertex_descriptor s,
-                       typename Graph::vertex_descriptor t,
+                       typename Graph::vertex_descriptor src,
+                       typename Graph::vertex_descriptor dst,
                        WeightMap wm, IndexMap im)
   {
     typedef typename Graph::vertex_descriptor vertex_descriptor;
     typedef typename Graph::edge_descriptor edge_descriptor;
     typedef typename std::list<typename Graph::edge_descriptor> path_type;
     typedef typename WeightMap::value_type weight_type;
-    typedef typename std::pair<weight_type, path_type> kr_type;
 
-    optional<kr_type> result;
+    std::map<vertex_descriptor, edge_descriptor> v2e;
+    auto pred = make_assoc_property_map(v2e);
+    auto rep = record_edge_predecessors(pred, on_edge_relaxed());
+    auto qat = cdc_visitor<Graph>(dst);
+    auto dv = make_dijkstra_visitor(std::make_pair(rep, qat));
 
-    if (s == t)
-      result = std::make_pair(0, path_type());
-    else
+    try
       {
-        std::vector<edge_descriptor> pred_vec(num_vertices(g));
-        auto pred = make_iterator_property_map(pred_vec.begin(), im);
-        auto rep = record_edge_predecessors(pred, on_edge_relaxed());
-        auto qat = cdc_visitor<Graph>(t);
-        auto dv = make_dijkstra_visitor(std::make_pair(rep, qat));
-
-        try
-          {
-            dijkstra_shortest_paths(g, s,
-                                    weight_map(wm).vertex_index_map(im).
-                                    visitor(dv));
-          }
-        catch (cdc_exception) {}
-
-        // Was the solution found?
-        if (pred[t] != edge_descriptor())
-          {
-            // The cost of the shortest path.
-            value_initialized<weight_type> cost;
-            // The path found.
-            path_type p;
-
-            // Trace the solution to the source.
-            vertex_descriptor c = t;
-            while (c != s)
-              {
-                const edge_descriptor &e = pred[c];
-                // Build the path.
-                p.push_front(e);
-                // Calculate the cost of the path.
-                cost += get(wm, e);
-                // Find the predecessing vertex.
-                c = source(e, g);
-              }
-
-            result = std::make_pair(cost, p);
-          }
+        dijkstra_shortest_paths(g, src,
+                                weight_map(wm).vertex_index_map(im).
+                                visitor(dv));
       }
+    catch (cdc_exception) {}
 
-    return result;
+    return trace(g, wm, pred, src, dst);
   }
 
 } // boost

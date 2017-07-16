@@ -17,6 +17,7 @@
 #define BOOST_GRAPH_CUSTOM_DIJKSTRA_CALL
 
 #include <list>
+#include <map>
 
 #include <boost/graph/dijkstra_shortest_paths.hpp>
 #include <boost/graph/visitors.hpp>
@@ -94,6 +95,15 @@ namespace boost {
     return result;
   }
 
+  // =======================================================================
+  // That's a helper function that uses BGL's Dijkstra.  There are two
+  // important points:
+  //
+  // * we stop the search where we reach the dst vertex,
+  //
+  // * we predecessor map associates an edge with a vertex.
+  //
+  // =======================================================================
   template <typename Graph, typename WeightMap, typename IndexMap,
             typename PredMap>
   void
@@ -115,7 +125,8 @@ namespace boost {
   }
 
   // =======================================================================
-  // The function that calls Dijkstra.
+  // The function that calls Dijkstra.  The function returns a list of
+  // edges of the shortest path.
   // =======================================================================
 
   template <typename Graph, typename WeightMap, typename IndexMap>
@@ -128,8 +139,6 @@ namespace boost {
   {
     typedef typename Graph::vertex_descriptor vertex_descriptor;
     typedef typename Graph::edge_descriptor edge_descriptor;
-    typedef typename std::list<typename Graph::edge_descriptor> path_type;
-    typedef typename WeightMap::value_type weight_type;
 
     std::map<vertex_descriptor, edge_descriptor> v2e;
     auto pred = make_assoc_property_map(v2e);

@@ -16,36 +16,15 @@
 #ifndef BOOST_GRAPH_CUSTOM_DIJKSTRA_CALL
 #define BOOST_GRAPH_CUSTOM_DIJKSTRA_CALL
 
-#include <list>
-#include <map>
-
 #include <boost/graph/dijkstra_shortest_paths.hpp>
 #include <boost/graph/visitors.hpp>
 #include <boost/optional.hpp>
 #include <boost/property_map/property_map.hpp>
 
+#include <list>
+#include <map>
+
 namespace boost {
-
-  // ========================================================================
-  // Finish the search when a given node is examined, i.e. when the
-  // shortest path to that node is found.
-  // ========================================================================
-
-  // The type of the exception thrown by the cdc_visitor.
-  struct cdc_exception {};
-
-  template <class Graph>
-  struct cdc_visitor
-  {
-    typedef typename Graph::vertex_descriptor vertex_descriptor;
-    typedef on_examine_vertex event_filter;
-    cdc_visitor(vertex_descriptor dst): m_dst(dst) {}
-    void operator()(vertex_descriptor v, const Graph& g) {
-      if (v == m_dst)
-        throw cdc_exception();
-    }
-    vertex_descriptor m_dst;
-  };
 
   // =======================================================================
   // The function that traces back the result.  The predecessos map
@@ -112,8 +91,23 @@ namespace boost {
                        typename Graph::vertex_descriptor dst,
                        WeightMap wm, IndexMap im, PredMap pm)
   {
+    // The type of the exception thrown by the cdc_visitor.
+    struct exception {};
+
+    struct visitor
+    {
+      typedef typename Graph::vertex_descriptor vertex_descriptor;
+      typedef on_examine_vertex event_filter;
+      visitor(vertex_descriptor dst): m_dst(dst) {}
+      void operator()(vertex_descriptor v, const Graph& g) {
+        if (v == m_dst)
+          throw exception();
+      }
+      vertex_descriptor m_dst;
+    };
+
     auto rep = record_edge_predecessors(pm, on_edge_relaxed());
-    auto qat = cdc_visitor<Graph>(dst);
+    auto qat = visitor(dst);
     auto dv = make_dijkstra_visitor(std::make_pair(rep, qat));
 
     try
@@ -121,7 +115,7 @@ namespace boost {
         dijkstra_shortest_paths(g, src, weight_map(wm).
                                 vertex_index_map(im).visitor(dv));
       }
-    catch (cdc_exception) {}
+    catch (exception) {}
   }
 
   // =======================================================================

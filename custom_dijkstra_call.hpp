@@ -47,7 +47,10 @@ namespace boost {
   };
 
   // =======================================================================
-  // The function that traces back the result.
+  // The function that traces back the result.  The predecessos map
+  // should map a vertex to an edge.  Traditional Dijkstra maps a
+  // vertex to a vertex.  However, we allow for multigraphs, and so we
+  // care about a specific edge that led to a vertex.
   // =======================================================================
 
   template <typename Graph, typename WeightMap, typename PredMap>

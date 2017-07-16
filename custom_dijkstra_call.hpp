@@ -94,6 +94,26 @@ namespace boost {
     return result;
   }
 
+  template <typename Graph, typename WeightMap, typename IndexMap,
+            typename PredMap>
+  void
+  stop_dijkstra_at_dst(const Graph &g,
+                       typename Graph::vertex_descriptor src,
+                       typename Graph::vertex_descriptor dst,
+                       WeightMap wm, IndexMap im, PredMap pm)
+  {
+    auto rep = record_edge_predecessors(pm, on_edge_relaxed());
+    auto qat = cdc_visitor<Graph>(dst);
+    auto dv = make_dijkstra_visitor(std::make_pair(rep, qat));
+
+    try
+      {
+        dijkstra_shortest_paths(g, src, weight_map(wm).
+                                vertex_index_map(im).visitor(dv));
+      }
+    catch (cdc_exception) {}
+  }
+
   // =======================================================================
   // The function that calls Dijkstra.
   // =======================================================================
@@ -113,18 +133,7 @@ namespace boost {
 
     std::map<vertex_descriptor, edge_descriptor> v2e;
     auto pred = make_assoc_property_map(v2e);
-    auto rep = record_edge_predecessors(pred, on_edge_relaxed());
-    auto qat = cdc_visitor<Graph>(dst);
-    auto dv = make_dijkstra_visitor(std::make_pair(rep, qat));
-
-    try
-      {
-        dijkstra_shortest_paths(g, src,
-                                weight_map(wm).vertex_index_map(im).
-                                visitor(dv));
-      }
-    catch (cdc_exception) {}
-
+    stop_dijkstra_at_dst(g, src, dst, wm, im, pred);
     return trace(g, wm, pred, src, dst);
   }
 

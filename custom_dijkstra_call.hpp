@@ -49,8 +49,10 @@ namespace boost {
 
     optional<r_type> result;
 
+    if (src == dst)
+      result = r_type();
     // Was the solution found?
-    if (pred[dst] != edge_descriptor())
+    else if (pred[dst] != edge_descriptor())
       {
         // The result.
         r_type r;

@@ -28,12 +28,12 @@
 #define BOOST_GRAPH_YEN_KSP
 
 #include <list>
+#include <optional>
 #include <set>
 #include <utility>
 
 #include <boost/graph/dijkstra_shortest_paths.hpp>
 #include <boost/graph/filtered_graph.hpp>
-#include <boost/optional.hpp>
 
 #include "custom_dijkstra_call.hpp"
 
@@ -65,7 +65,7 @@ namespace boost {
                                    is_not_in_subset<es_type>,
                                    is_not_in_subset<vs_type>>;
 
-    optional<kr_type> ksp;
+    std::optional<kr_type> ksp;
 
     // If A is empty, then we're looking for the first shortest path.
     if (A.empty())
@@ -137,13 +137,13 @@ namespace boost {
               }
 
             // Optional spur result.
-            optional<kr_type>
+            std::optional<kr_type>
               osr = custom_dijkstra_call(fg, sv, t, wm, im);
 
             if (osr)
               {
                 // The tentative result.
-                kr_type tr = std::move(osr.get());
+                kr_type tr = std::move(osr.value());
                 tr.first += rr.first;
                 tr.second.insert(tr.second.begin(), rp.begin(),
                                  rp.end());
@@ -177,7 +177,7 @@ namespace boost {
       }
   
     if (ksp)
-      A.push_back(std::move(ksp.get()));
+      A.push_back(std::move(ksp.value()));
           
     return bool(ksp);
   }
@@ -186,7 +186,7 @@ namespace boost {
   std::list<std::pair<typename WeightMap::value_type,
                       std::list<typename Graph::edge_descriptor>>>
   yen_ksp(const Graph& g, Vertex<Graph> s, Vertex<Graph> t,
-          WeightMap wm, IndexMap im, optional<unsigned> K)
+          WeightMap wm, IndexMap im, std::optional<unsigned> K)
   {
     using kr_type = Result<typename WeightMap::value_type, Graph>;
 
@@ -204,7 +204,7 @@ namespace boost {
         std::set<kr_type> B;
 
         // In each iteration we produce the k-th shortest path.
-        for (int k = 1; !K || k <= K.get(); ++k)
+        for (int k = 1; !K || k <= K.value(); ++k)
           if (!yen_ksp(g, s, t, wm, im, A, B))
             // We break the loop if no path was found.
             break;
@@ -217,7 +217,7 @@ namespace boost {
   std::list<std::pair<typename property_map<Graph, edge_weight_t>::value_type,
                       std::list<Edge<Graph>>>>
   yen_ksp(const Graph& g, Vertex<Graph> s, Vertex<Graph> t,
-          optional<unsigned> K = optional<unsigned>())
+          std::optional<unsigned> K = std::optional<unsigned>())
   {
     return yen_ksp(g, s, t, get(edge_weight_t(), g),
                    get(vertex_index_t(), g), K);

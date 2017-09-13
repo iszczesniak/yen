@@ -18,11 +18,11 @@
 
 #include <boost/graph/dijkstra_shortest_paths.hpp>
 #include <boost/graph/visitors.hpp>
-#include <boost/optional.hpp>
 #include <boost/property_map/property_map.hpp>
 
 #include <list>
 #include <map>
+#include <optional>
 
 namespace boost {
 
@@ -34,8 +34,8 @@ namespace boost {
   // =======================================================================
 
   template <typename Graph, typename WeightMap, typename PredMap>
-  optional<std::pair<typename WeightMap::value_type,
-                     std::list<typename Graph::edge_descriptor> > >
+  std::optional<std::pair<typename WeightMap::value_type,
+                          std::list<typename Graph::edge_descriptor> > >
   trace(const Graph &g, WeightMap wm, PredMap pred,
         typename Graph::vertex_descriptor src,
         typename Graph::vertex_descriptor dst)
@@ -47,7 +47,7 @@ namespace boost {
     // The result type.
     typedef typename std::pair<weight_type, path_type> r_type;
 
-    optional<r_type> result;
+    std::optional<r_type> result;
 
     if (src == dst)
       result = r_type();
@@ -80,7 +80,7 @@ namespace boost {
   // That's a helper function that uses BGL's Dijkstra.  There are two
   // important points:
   //
-  // * we stop the search where we reach the dst vertex,
+  // * we stop the search when we reach the dst vertex,
   //
   // * we predecessor map associates an edge with a vertex.
   //
@@ -126,8 +126,8 @@ namespace boost {
   // =======================================================================
 
   template <typename Graph, typename WeightMap, typename IndexMap>
-  optional<std::pair<typename WeightMap::value_type,
-                     std::list<typename Graph::edge_descriptor> > >
+  std::optional<std::pair<typename WeightMap::value_type,
+                          std::list<typename Graph::edge_descriptor> > >
   custom_dijkstra_call(const Graph &g,
                        typename Graph::vertex_descriptor src,
                        typename Graph::vertex_descriptor dst,

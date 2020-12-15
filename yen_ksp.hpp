@@ -48,19 +48,19 @@ namespace boost {
   template <typename G>
   using Path = std::list<Edge<G>>;
   
-  template <typename W, typename G>
-  using Result = std::pair<W, Path<G>>;
+  template <typename G, typename T>
+  using Result = std::pair<T, Path<G>>;
 
   template <typename Graph, typename WeightMap, typename IndexMap>
   bool
   yen_ksp(const Graph& g, Vertex<Graph> s, Vertex<Graph> t,
           WeightMap wm, IndexMap im,
-          std::list<Result<typename WeightMap::value_type, Graph>> &A,
-          std::set<Result<typename WeightMap::value_type, Graph>> &B)
+          std::list<Result<Graph, typename WeightMap::value_type>> &A,
+          std::set<Result<Graph, typename WeightMap::value_type>> &B)
   {
     using vs_type = std::set<Vertex<Graph>>;
     using es_type = std::set<Edge<Graph>>;
-    using kr_type = Result<typename WeightMap::value_type, Graph>;
+    using kr_type = Result<Graph, typename WeightMap::value_type>;
     using fg_type = filtered_graph<Graph,
                                    is_not_in_subset<es_type>,
                                    is_not_in_subset<vs_type>>;
@@ -188,7 +188,7 @@ namespace boost {
   yen_ksp(const Graph& g, Vertex<Graph> s, Vertex<Graph> t,
           WeightMap wm, IndexMap im, std::optional<unsigned> K)
   {
-    using kr_type = Result<typename WeightMap::value_type, Graph>;
+    using kr_type = Result<Graph, typename WeightMap::value_type>;
 
     // The shortest paths - these we return.
     std::list<kr_type> A;
